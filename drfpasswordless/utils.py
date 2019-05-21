@@ -1,5 +1,7 @@
 import logging
 import os
+import boto3
+import json
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
@@ -11,6 +13,29 @@ from drfpasswordless.settings import api_settings
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+def _publish_sqs_email_msg(subject, body_txt, body_html, recip, sender, reply_to=None):
+    """
+    Publish a message representing an email to the `settings.SES_EMAIL_SEND_QUEUE`
+    SQS queue
+    """
+    session = boto3.Session(aws_access_key_id=api_settings.PASSWORDLESS_AWS_S3_ACCESS_KEY_ID,
+                            aws_secret_access_key=api_settings.PASSWORDLESS_AWS_S3_SECRET_ACCESS_KEY,
+                            region_name=api_settings.PASSWORDLESS_AWS_REGION)
+    sqs = session.resource('sqs')
+    queue = sqs.get_queue_by_name(QueueName=api_settings.PASSWORDLESS_SES_EMAIL_SEND_QUEUE)
+    # MessageBody should be JSON string
+    response = queue.send_message(MessageBody=json.dumps({"subject": subject,
+                                                          "body_txt": body_txt,
+                                                          "body_html": body_html,
+                                                          "sender": sender,
+                                                          "recip": recip,
+                                                          "reply_to": reply_to,
+                                                          }))
+    logger.debug('Sent email message to SQS queue {}.'
+                 ' MessageId: {}'.format(api_settings.PASSWORDLESS_SES_EMAIL_SEND_QUEUE, response['MessageId']))
+    logger.debug('body_html: {}'.format(body_html))
 
 
 def authenticate_by_token(callback_token):
@@ -124,13 +149,19 @@ def send_email_with_callback_token(user, email_token, **kwargs):
             # Inject context if user specifies.
             context = inject_template_context({'callback_token': email_token.key, })
             html_message = loader.render_to_string(email_html, context,)
-            send_mail(
-                email_subject,
-                email_plaintext % email_token.key,
-                api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
-                [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
-                fail_silently=False,
-                html_message=html_message,)
+            if api_settings.PASSWORDLESS_AWS_S3_ACCESS_KEY_ID:
+                # Go via SQS/SES
+                _publish_sqs_email_msg(email_subject, email_plaintext % email_token.key, html_message,
+                                       [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
+                                       reply_to=api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS)
+            else:
+                send_mail(
+                    email_subject,
+                    email_plaintext % email_token.key,
+                    api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
+                    [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
+                    fail_silently=False,
+                    html_message=html_message,)
 
         else:
             logger.debug("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")

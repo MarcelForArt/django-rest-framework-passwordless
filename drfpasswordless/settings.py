@@ -69,6 +69,12 @@ DEFAULTS = {
     # Automatically send verification email or sms when a user changes their alias.
     'PASSWORDLESS_AUTO_SEND_VERIFICATION_TOKEN': False,
 
+    # Sending emails via SQS
+    'PASSWORDLESS_AWS_S3_ACCESS_KEY_ID': None,
+    'PASSWORDLESS_AWS_S3_SECRET_ACCESS_KEY': None,
+    'PASSWORDLESS_AWS_REGION': None,
+    'PASSWORDLESS_SES_EMAIL_SEND_QUEUE': None
+
 }
 
 # List of settings that may be in string import notation.
