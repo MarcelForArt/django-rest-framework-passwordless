@@ -153,6 +153,7 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                 # Go via SQS/SES
                 _publish_sqs_email_msg(email_subject, email_plaintext % email_token.key, html_message,
                                        [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
+                                       sender=api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
                                        reply_to=api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS)
             else:
                 send_mail(
