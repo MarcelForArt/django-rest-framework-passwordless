@@ -22,6 +22,9 @@ class AbstractBaseObtainCallbackToken(APIView):
     """
     This returns a 6-digit callback token we can trade for a user's Auth Token.
     """
+    # Differing from original: demand auth users
+    permission_classes = (IsAuthenticated,)
+
     success_response = "A login token has been sent to you."
     failure_response = "Unable to send you a login code. Try again later."
 
@@ -42,27 +45,34 @@ class AbstractBaseObtainCallbackToken(APIView):
             # Only allow auth types allowed in settings.
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        serializer = self.serializer_class(data=request.data, context={'request': request})
-        if serializer.is_valid(raise_exception=True):
-            # Validate -
-            user = serializer.validated_data['user']
-            # Create and send callback token
-            success = TokenService.send_token(user, self.alias_type, **self.message_payload)
-
-            # Respond With Success Or Failure of Sent
-            if success:
-                status_code = status.HTTP_200_OK
-                response_detail = self.success_response
+        # Differing from original lib: we only allow staff users to submit an email in the payload to
+        # send to whichever user they please. Non-staff users are limited to sending to request.user (themselves)
+        # We set permissions to IsAuthenticated too
+        if request.user.is_staff:
+            serializer = self.serializer_class(data=request.data, context={'request': request})
+            if serializer.is_valid(raise_exception=True):
+                # Validate -
+                user = serializer.validated_data['user']
             else:
-                status_code = status.HTTP_400_BAD_REQUEST
-                response_detail = self.failure_response
-            return Response({'detail': response_detail}, status=status_code)
+                return Response(serializer.error_messages, status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response(serializer.error_messages, status=status.HTTP_400_BAD_REQUEST)
+            user = request.user
+
+        # Create and send callback token
+        success = TokenService.send_token(user, self.alias_type, **self.message_payload)
+
+        # Respond With Success Or Failure of Sent
+        if success:
+            status_code = status.HTTP_200_OK
+            response_detail = self.success_response
+        else:
+            status_code = status.HTTP_400_BAD_REQUEST
+            response_detail = self.failure_response
+        return Response({'detail': response_detail}, status=status_code)
 
 
 class ObtainEmailCallbackToken(AbstractBaseObtainCallbackToken):
-    permission_classes = (AllowAny,)
+    # We only allow authenticated users to request magic link
     serializer_class = EmailAuthSerializer
     success_response = "A login token has been sent to your email."
     failure_response = "Unable to email you a login code. Try again later."
@@ -78,7 +88,6 @@ class ObtainEmailCallbackToken(AbstractBaseObtainCallbackToken):
 
 
 class ObtainMobileCallbackToken(AbstractBaseObtainCallbackToken):
-    permission_classes = (AllowAny,)
     serializer_class = MobileAuthSerializer
     success_response = "We texted you a login code."
     failure_response = "Unable to send you a login code. Try again later."

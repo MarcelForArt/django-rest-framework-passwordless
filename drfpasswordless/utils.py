@@ -171,8 +171,8 @@ def send_email_with_callback_token(user, email_token, **kwargs):
 
     except Exception as e:
         logger.debug("Failed to send token email to user: %d."
-                  "Possibly no email on user object. Email entered was %s" %
-                  (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
+                     "Possibly no email on user object. Email entered was %s" %
+                    (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
         logger.debug(e)
         return False
 

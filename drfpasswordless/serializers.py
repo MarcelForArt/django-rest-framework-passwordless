@@ -168,7 +168,7 @@ class AbstractBaseCallbackTokenSerializer(serializers.Serializer):
     Abstract class inspired by DRF's own token serializer.
     Returns a user if valid, None or a message if not.
     """
-    token = TokenField(min_length=6, max_length=6, validators=[token_age_validator])
+    token = TokenField(min_length=32, max_length=32, validators=[token_age_validator])
 
 
 class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):

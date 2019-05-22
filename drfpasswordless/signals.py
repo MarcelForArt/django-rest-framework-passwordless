@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.db.models import signals
 from drfpasswordless.models import CallbackToken
-from drfpasswordless.models import generate_numeric_token
+from drfpasswordless.models import generate_hex_token
 from drfpasswordless.settings import api_settings
 from drfpasswordless.services import TokenService
 
@@ -33,7 +33,7 @@ def check_unique_tokens(sender, instance, **kwargs):
     """
     if isinstance(instance, CallbackToken):
         if CallbackToken.objects.filter(key=instance.key, is_active=True).exists():
-            instance.key = generate_numeric_token()
+            instance.key = generate_hex_token()
 
 
 User = get_user_model()

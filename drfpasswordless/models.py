@@ -5,7 +5,7 @@ from django.conf import settings
 
 
 def generate_hex_token():
-    return uuid.uuid1().hex
+    return uuid.uuid4().hex
 
 
 def generate_numeric_token():
@@ -54,9 +54,9 @@ class AbstractBaseCallbackToken(models.Model):
 
 class CallbackToken(AbstractBaseCallbackToken):
     """
-    Generates a random six digit number to be returned.
+    Generates a random uuid4 to be returned.
     """
-    key = models.CharField(default=generate_numeric_token, max_length=6, unique=True)
+    key = models.CharField(default=generate_hex_token, max_length=32, unique=True)
 
     class Meta(AbstractBaseCallbackToken.Meta):
         verbose_name = 'Callback Token'
