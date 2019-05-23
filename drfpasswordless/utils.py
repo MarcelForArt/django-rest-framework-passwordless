@@ -1,7 +1,6 @@
 import logging
 import os
-import boto3
-import json
+import mandrill
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
@@ -15,27 +14,32 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-def _publish_sqs_email_msg(subject, body_txt, body_html, recip, sender, reply_to=None):
+def _send_mandrill_email_msg(recip, callback_token, user, template_name):
     """
-    Publish a message representing an email to the `settings.SES_EMAIL_SEND_QUEUE`
-    SQS queue
+    Create the template in Mailchimp then export to Mandrill. Ensure
+    to add {{callback_token}} and {{first_name}} variables in the template
+    and check after the export to Mailchimp that it hasn't corrupted these
+
+    :param recip:
+    :param callback_token:
+    :param user:
+    :param template_name:
+    :return:
     """
-    session = boto3.Session(aws_access_key_id=api_settings.PASSWORDLESS_AWS_S3_ACCESS_KEY_ID,
-                            aws_secret_access_key=api_settings.PASSWORDLESS_AWS_S3_SECRET_ACCESS_KEY,
-                            region_name=api_settings.PASSWORDLESS_AWS_REGION)
-    sqs = session.resource('sqs')
-    queue = sqs.get_queue_by_name(QueueName=api_settings.PASSWORDLESS_SES_EMAIL_SEND_QUEUE)
-    # MessageBody should be JSON string
-    response = queue.send_message(MessageBody=json.dumps({"subject": subject,
-                                                          "body_txt": body_txt,
-                                                          "body_html": body_html,
-                                                          "sender": sender,
-                                                          "recip": recip,
-                                                          "reply_to": reply_to,
-                                                          }))
-    logger.debug('Sent email message to SQS queue {}.'
-                 ' MessageId: {}'.format(api_settings.PASSWORDLESS_SES_EMAIL_SEND_QUEUE, response['MessageId']))
-    logger.debug('body_html: {}'.format(body_html))
+    try:
+        mandrill_client = mandrill.Mandrill(api_settings.PASSWORDLESS_MANDRILL_API_KEY)
+        # Prepare message to send w/ dynamic content
+        message = {'to': [{'email': recip, 'type': 'to'}], 'track_opens': True, 'track_clicks': True,
+                   'global_merge_vars': [{'content': callback_token, 'name': 'callback_token'},
+                                         {'content': user.first_name, 'name': 'first_name'},
+                                         ]
+                   }
+        result = mandrill_client.messages.send_template(template_name=template_name, template_content=[],
+                                                        message=message, async=False, ip_pool='Main Pool')
+        logger.info(result)
+    except mandrill.Error as e:
+        logger.error(e)
+        return {'statusCode': 500, 'error': str(e)}
 
 
 def authenticate_by_token(callback_token):
@@ -137,25 +141,23 @@ def send_email_with_callback_token(user, email_token, **kwargs):
     try:
         if api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS:
             # Make sure we have a sending address before sending.
-
-            # Get email subject and message
-            email_subject = kwargs.get('email_subject',
-                                       api_settings.PASSWORDLESS_EMAIL_SUBJECT)
-            email_plaintext = kwargs.get('email_plaintext',
-                                         api_settings.PASSWORDLESS_EMAIL_PLAINTEXT_MESSAGE)
-            email_html = kwargs.get('email_html',
-                                    api_settings.PASSWORDLESS_EMAIL_TOKEN_HTML_TEMPLATE_NAME)
-
-            # Inject context if user specifies.
-            context = inject_template_context({'callback_token': email_token.key, })
-            html_message = loader.render_to_string(email_html, context,)
-            if api_settings.PASSWORDLESS_AWS_S3_ACCESS_KEY_ID:
-                # Go via SQS/SES
-                _publish_sqs_email_msg(email_subject, email_plaintext % email_token.key, html_message,
-                                       getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME),
-                                       sender=api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
-                                       reply_to=api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS)
+            if api_settings.PASSWORDLESS_MANDRILL_API_KEY:
+                # Go via Mandrill
+                template_name = kwargs.get('template')
+                _send_mandrill_email_msg(getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME),
+                                         email_token.key, user, template_name)
             else:
+                # Get email subject and message
+                email_subject = kwargs.get('email_subject',
+                                           api_settings.PASSWORDLESS_EMAIL_SUBJECT)
+                email_plaintext = kwargs.get('email_plaintext',
+                                             api_settings.PASSWORDLESS_EMAIL_PLAINTEXT_MESSAGE)
+                email_html = kwargs.get('email_html',
+                                        api_settings.PASSWORDLESS_EMAIL_TOKEN_HTML_TEMPLATE_NAME)
+
+                # Inject context if user specifies.
+                context = inject_template_context({'callback_token': email_token.key, })
+                html_message = loader.render_to_string(email_html, context,)
                 send_mail(
                     email_subject,
                     email_plaintext % email_token.key,

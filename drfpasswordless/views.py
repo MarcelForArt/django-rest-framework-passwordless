@@ -45,30 +45,25 @@ class AbstractBaseObtainCallbackToken(APIView):
             # Only allow auth types allowed in settings.
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        # Differing from original lib: we only allow staff users to submit an email in the payload to
-        # send to whichever user they please. Non-staff users are limited to sending to request.user (themselves)
-        # We set permissions to IsAuthenticated too
-        if request.user.is_staff:
-            serializer = self.serializer_class(data=request.data, context={'request': request})
-            if serializer.is_valid(raise_exception=True):
-                # Validate -
-                user = serializer.validated_data['user']
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        if serializer.is_valid(raise_exception=True):
+            # Validate -
+            user = serializer.validated_data['user']
+            # Differing from original lib: we allow optional template and pass this to send_token
+            template = serializer.validated_data.get('template')
+            # Create and send callback token
+            success = TokenService.send_token(user, self.alias_type, template=template, **self.message_payload)
+
+            # Respond With Success Or Failure of Sent
+            if success:
+                status_code = status.HTTP_200_OK
+                response_detail = self.success_response
             else:
-                return Response(serializer.error_messages, status=status.HTTP_400_BAD_REQUEST)
+                status_code = status.HTTP_400_BAD_REQUEST
+                response_detail = self.failure_response
+            return Response({'detail': response_detail}, status=status_code)
         else:
-            user = request.user
-
-        # Create and send callback token
-        success = TokenService.send_token(user, self.alias_type, **self.message_payload)
-
-        # Respond With Success Or Failure of Sent
-        if success:
-            status_code = status.HTTP_200_OK
-            response_detail = self.success_response
-        else:
-            status_code = status.HTTP_400_BAD_REQUEST
-            response_detail = self.failure_response
-        return Response({'detail': response_detail}, status=status_code)
+            return Response(serializer.error_messages, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ObtainEmailCallbackToken(AbstractBaseObtainCallbackToken):

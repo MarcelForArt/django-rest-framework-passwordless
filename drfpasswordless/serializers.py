@@ -36,35 +36,37 @@ class AbstractBaseAliasAuthenticationSerializer(serializers.Serializer):
     def validate(self, attrs):
         alias = attrs.get(self.alias_type)
 
-        if alias:
-            # Create or authenticate a user
-            # Return THem
+        request_user = self.context['request'].user
+        if not request_user.is_staff or not alias:
+            # They don't get a choice of user by email if not staff or didn't specify email in payload
+            # They can only act on the request.user
+            attrs['user'] = request_user
+            return attrs
 
-            if api_settings.PASSWORDLESS_REGISTER_NEW_USERS is True:
-                # If new aliases should register new users.
-                user, user_created = User.objects.get_or_create(
-                    **{self.alias_type: alias})
+        # Create or authenticate a user
+        # Return Them
+        if api_settings.PASSWORDLESS_REGISTER_NEW_USERS is True:
+            # If new aliases should register new users.
+            user, user_created = User.objects.get_or_create(
+                **{self.alias_type: alias})
 
-                if user_created:
-                    user.set_unusable_password()
-                    user.save()
-            else:
-                # If new aliases should not register new users.
-                try:
-                    user = User.objects.get(**{self.alias_type: alias})
-                except User.DoesNotExist:
-                    user = None
+            if user_created:
+                user.set_unusable_password()
+                user.save()
+        else:
+            # If new aliases should not register new users.
+            try:
+                user = User.objects.get(**{self.alias_type: alias})
+            except User.DoesNotExist:
+                user = None
 
-            if user:
-                if not user.is_active:
-                    # If valid, return attrs so we can create a token in our logic controller
-                    msg = _('User account is disabled.')
-                    raise serializers.ValidationError(msg)
-            else:
-                msg = _('No account is associated with this alias.')
+        if user:
+            if not user.is_active:
+                # If valid, return attrs so we can create a token in our logic controller
+                msg = _('User account is disabled.')
                 raise serializers.ValidationError(msg)
         else:
-            msg = _('Missing %s.') % self.alias_type
+            msg = _('No account is associated with this alias.')
             raise serializers.ValidationError(msg)
 
         attrs['user'] = user
@@ -76,7 +78,10 @@ class EmailAuthSerializer(AbstractBaseAliasAuthenticationSerializer):
     def alias_type(self):
         return 'email'
 
-    email = serializers.EmailField()
+    # Determine the template with which to send the email
+    template = serializers.ChoiceField(choices=api_settings.PASSWORDLESS_TEMPLATE_CHOICES, allow_blank=True,
+                                       default=api_settings.PASSWORDLESS_TEMPLATE_CHOICES[0])
+    email = serializers.EmailField(allow_blank=True)
 
 
 class MobileAuthSerializer(AbstractBaseAliasAuthenticationSerializer):

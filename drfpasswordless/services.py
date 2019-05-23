@@ -7,7 +7,7 @@ from drfpasswordless.utils import (
 
 class TokenService(object):
     @staticmethod
-    def send_token(user, alias_type, **message_payload):
+    def send_token(user, alias_type, template=None, **message_payload):
         token = create_callback_token_for_user(user, alias_type)
         send_action = None
         if alias_type == 'email':
@@ -15,5 +15,5 @@ class TokenService(object):
         elif alias_type == 'mobile':
             send_action = send_sms_with_callback_token
         # Send to alias
-        success = send_action(user, token, **message_payload)
+        success = send_action(user, token, template=template, **message_payload)
         return success
