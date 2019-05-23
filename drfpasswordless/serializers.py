@@ -80,7 +80,7 @@ class EmailAuthSerializer(AbstractBaseAliasAuthenticationSerializer):
 
     # Determine the template with which to send the email
     template = serializers.ChoiceField(choices=api_settings.PASSWORDLESS_TEMPLATE_CHOICES, required=False,
-                                       default=api_settings.PASSWORDLESS_TEMPLATE_CHOICES[0])
+                                       default=api_settings.PASSWORDLESS_TEMPLATE_CHOICES[0][0])
     email = serializers.EmailField(required=False)
 
 
