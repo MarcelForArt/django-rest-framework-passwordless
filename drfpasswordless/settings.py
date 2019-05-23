@@ -72,6 +72,9 @@ DEFAULTS = {
     # Sending emails via Mandrill
     'PASSWORDLESS_MANDRILL_API_KEY': None,
 
+    # Templates
+    'PASSWORDLESS_TEMPLATE_CHOICES': []
+
 }
 
 # List of settings that may be in string import notation.
