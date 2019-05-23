@@ -26,20 +26,16 @@ def _send_mandrill_email_msg(recip, callback_token, user, template_name):
     :param template_name:
     :return:
     """
-    try:
-        mandrill_client = mandrill.Mandrill(api_settings.PASSWORDLESS_MANDRILL_API_KEY)
-        # Prepare message to send w/ dynamic content
-        message = {'to': [{'email': recip, 'type': 'to'}], 'track_opens': True, 'track_clicks': True,
-                   'global_merge_vars': [{'content': callback_token, 'name': 'callback_token'},
-                                         {'content': user.first_name, 'name': 'first_name'},
-                                         ]
-                   }
-        result = mandrill_client.messages.send_template(template_name=template_name, template_content=[],
-                                                        message=message, async=False, ip_pool='Main Pool')
-        logger.info(result)
-    except mandrill.Error as e:
-        logger.error(e)
-        return {'statusCode': 500, 'error': str(e)}
+    mandrill_client = mandrill.Mandrill(api_settings.PASSWORDLESS_MANDRILL_API_KEY)
+    # Prepare message to send w/ dynamic content
+    message = {'to': [{'email': recip, 'type': 'to'}], 'track_opens': True, 'track_clicks': True,
+               'global_merge_vars': [{'content': callback_token, 'name': 'callback_token'},
+                                     {'content': user.first_name, 'name': 'first_name'},
+                                     ]
+               }
+    result = mandrill_client.messages.send_template(template_name=template_name, template_content=[],
+                                                    message=message, async=False, ip_pool='Main Pool')
+    logger.info(result)
 
 
 def authenticate_by_token(callback_token):

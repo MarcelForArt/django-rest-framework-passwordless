@@ -50,7 +50,7 @@ class AbstractBaseObtainCallbackToken(APIView):
             # Validate -
             user = serializer.validated_data['user']
             # Differing from original lib: we allow optional template and pass this to send_token
-            template = serializer.validated_data.get('template')
+            template = serializer.validated_data.get('template')[1]
             # Create and send callback token
             success = TokenService.send_token(user, self.alias_type, template=template, **self.message_payload)
 
