@@ -79,9 +79,9 @@ class EmailAuthSerializer(AbstractBaseAliasAuthenticationSerializer):
         return 'email'
 
     # Determine the template with which to send the email
-    template = serializers.ChoiceField(choices=api_settings.PASSWORDLESS_TEMPLATE_CHOICES, allow_blank=True,
+    template = serializers.ChoiceField(choices=api_settings.PASSWORDLESS_TEMPLATE_CHOICES, required=False,
                                        default=api_settings.PASSWORDLESS_TEMPLATE_CHOICES[0])
-    email = serializers.EmailField(allow_blank=True)
+    email = serializers.EmailField(required=False)
 
 
 class MobileAuthSerializer(AbstractBaseAliasAuthenticationSerializer):
