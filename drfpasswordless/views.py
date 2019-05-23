@@ -49,10 +49,14 @@ class AbstractBaseObtainCallbackToken(APIView):
         if serializer.is_valid(raise_exception=True):
             # Validate -
             user = serializer.validated_data['user']
-            # Differing from original lib: we allow optional template and pass this to send_token
-            template = serializer.validated_data.get('template')[1]
+            template_name = None
+            if api_settings.PASSWORDLESS_TEMPLATE_CHOICES:
+                # Differing from original lib: we allow optional template and pass this to send_token
+                template_idx = serializer.validated_data.get('template')  # default 1
+                template_name = [choice for choice in api_settings.PASSWORDLESS_TEMPLATE_CHOICES if choice[0]
+                                 == template_idx][0][1]
             # Create and send callback token
-            success = TokenService.send_token(user, self.alias_type, template=template, **self.message_payload)
+            success = TokenService.send_token(user, self.alias_type, template=template_name, **self.message_payload)
 
             # Respond With Success Or Failure of Sent
             if success:

@@ -140,8 +140,11 @@ def send_email_with_callback_token(user, email_token, **kwargs):
             if api_settings.PASSWORDLESS_MANDRILL_API_KEY:
                 # Go via Mandrill
                 template_name = kwargs.get('template')
-                _send_mandrill_email_msg(getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME),
-                                         email_token.key, user, template_name)
+                if template_name:
+                    _send_mandrill_email_msg(getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME),
+                                             email_token.key, user, template_name)
+                else:
+                    raise Exception('Ensure PASSWORDLESS_TEMPLATE_CHOICES has been set')
             else:
                 # Get email subject and message
                 email_subject = kwargs.get('email_subject',
