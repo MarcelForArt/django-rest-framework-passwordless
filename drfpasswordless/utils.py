@@ -32,7 +32,7 @@ def _send_mandrill_email_msg(recip, callback_token, user, template_name):
                'global_merge_vars': [{'content': callback_token, 'name': 'callback_token'},
                                      {'content': user.first_name, 'name': 'first_name'},
                                      {'content': api_settings.PASSWORDLESS_MARCEL_HOST, 'name': 'marcel_host'},
-                                     {'content': api_settings.PASSWORDLESS_MAILCHIMP_UNSUB_LINK, 'name': 'unsub_link'},
+                                     {'content': api_settings.PASSWORDLESS_MAILCHIMP_UNSUB_LINK, 'name': 'redirect_unsub'},
                                      ]
                }
     result = mandrill_client.messages.send_template(template_name=template_name, template_content=[],
