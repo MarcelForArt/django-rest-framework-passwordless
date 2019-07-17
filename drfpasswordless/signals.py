@@ -13,17 +13,20 @@ logger = logging.getLogger(__name__)
 @receiver(signals.pre_save, sender=CallbackToken)
 def invalidate_previous_tokens(sender, instance, **kwargs):
     """
+    EDIT: https://github.com/aaronn/django-rest-framework-passwordless/issues/30
+
     Invalidates all previously issued tokens as a post_save signal.
     """
-    active_tokens = None
+    # active_tokens = None
     if isinstance(instance, CallbackToken):
-        active_tokens = CallbackToken.objects.active().filter(user=instance.user).exclude(id=instance.id)
+        CallbackToken.objects.active().filter(user=instance.user).exclude(id=instance.id)\
+            .update(is_active=False)
 
     # Invalidate tokens
-    if active_tokens:
-        for token in active_tokens:
-            token.is_active = False
-            token.save()
+    # if active_tokens:
+    #     for token in active_tokens:
+    #         token.is_active = False
+    #         token.save()
 
 
 @receiver(signals.pre_save, sender=CallbackToken)
