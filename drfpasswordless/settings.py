@@ -72,6 +72,12 @@ DEFAULTS = {
     # Sending emails via Mandrill
     'PASSWORDLESS_MANDRILL_API_KEY': None,
 
+    # Sending emails via Mailchimp
+    'PASSWORDLESS_MAILCHIMP_BASE_URL': None,
+    'PASSWORDLESS_MAILCHIMP_API_KEY': None,
+    'PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID': None,
+
+
     # Templates
     'PASSWORDLESS_TEMPLATE_CHOICES': [],
     'PASSWORDLESS_MARCEL_HOST': None,

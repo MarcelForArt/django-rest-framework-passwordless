@@ -187,7 +187,8 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                                              email_token.key, user, template_name)
                 else:
                     raise Exception('Ensure PASSWORDLESS_TEMPLATE_CHOICES has been set')
-            elif api_settings.PASSWORDLESS_MAILCHIMP_API_KEY:
+            elif (api_settings.PASSWORDLESS_MAILCHIMP_API_KEY and api_settings.PASSWORDLESS_MAILCHIMP_BASE_URL and
+                  api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID):
                 # Go via Mailchimp campaign
                 campaign_trigger_url = kwargs.get('campaign_trigger_url')
                 if campaign_trigger_url:
