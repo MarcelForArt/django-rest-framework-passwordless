@@ -216,15 +216,15 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                     html_message=html_message,)
 
         else:
-            logger.debug("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")
+            logger.error("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")
             return False
         return True
 
     except Exception as e:
-        logger.debug("Failed to send token email to user: %d."
+        logger.error("Failed to send token email to user: %d."
                      "Possibly no email on user object. Email entered was %s" %
                     (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
-        logger.debug(e)
+        logger.error(e)
         return False
 
 
