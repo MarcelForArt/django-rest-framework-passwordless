@@ -1,6 +1,8 @@
 import logging
 import os
+import requests
 import mandrill
+import hashlib
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
@@ -38,6 +40,45 @@ def _send_mandrill_email_msg(recip, callback_token, user, template_name):
     result = mandrill_client.messages.send_template(template_name=template_name, template_content=[],
                                                     message=message, async=False, ip_pool='Main Pool')
     logger.info(result)
+
+
+def _update_mailchimp_merge_fields(user, merge_field_dict):
+    """
+    Update the merge fields for this user on Mailchimp - we want to set the custom merge field
+    MAGICTOKEN with the token we generated before we fire the campaign to that user, so the magic link
+    will be generated correctly using ?token=*|MAGICTOKEN|*
+
+    :param user:
+    :param merge_field_dict:
+    :return:
+    """
+    md5_email = hashlib.md5(user.email.encode('utf-8')).hexdigest()
+    member_url = f'{api_settings.PASSWORDLESS_MAILCHIMP_BASE_URL}/lists/{api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID}/members/{md5_email}'
+    r = requests.put(member_url, json=merge_field_dict, auth=('anystring', api_settings.PASSWORDLESS_MAILCHIMP_API_KEY))
+    r.raise_for_status()
+
+
+def _send_mailchimp_email_msg(user, callback_token, campaign_trigger_url):
+    """
+    Set the MAGICTOKEN merge variable for this user on mailchimp.
+    Trigger the automation
+
+    :param user:
+    :param callback_token:
+    :param campaign_trigger_url: the mailchimp API 3.0 trigger url for automation of campaign
+                                (send this email to specific user when that url endpoint is hit)
+    :return:
+    """
+    # Update the merge field MAGICTOKEN on this Mailchimp user first
+    _update_mailchimp_merge_fields(user, {"merge_fields": {"MAGICTOKEN": callback_token}})
+
+    # Trigger the campaign by the automation API 3.0 endpoint for this user email
+    response = requests.post(campaign_trigger_url,
+                             json={'email_address': user.email},
+                             auth=('anystring', api_settings.PASSWORDLESS_MAILCHIMP_API_KEY))
+    response.raise_for_status()
+
+    logger.info(response)
 
 
 def authenticate_by_token(callback_token):
@@ -135,7 +176,6 @@ def send_email_with_callback_token(user, email_token, **kwargs):
 
     Passes silently without sending in test environment
     """
-
     try:
         if api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS:
             # Make sure we have a sending address before sending.
@@ -147,6 +187,13 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                                              email_token.key, user, template_name)
                 else:
                     raise Exception('Ensure PASSWORDLESS_TEMPLATE_CHOICES has been set')
+            elif api_settings.PASSWORDLESS_MAILCHIMP_API_KEY:
+                # Go via Mailchimp campaign
+                campaign_trigger_url = kwargs.get('campaign_trigger_url')
+                if campaign_trigger_url:
+                    _send_mailchimp_email_msg(user, email_token.key, campaign_trigger_url)
+                else:
+                    raise Exception('Ensure to pass the campaign_trigger_url as kwarg')
             else:
                 # Get email subject and message
                 email_subject = kwargs.get('email_subject',
