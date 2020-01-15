@@ -70,16 +70,23 @@ def _send_mailchimp_email_msg(user, callback_token, campaign_trigger_url):
                                 (send this email to specific user when that url endpoint is hit)
     :return:
     """
-    # Update the merge field MAGICTOKEN on this Mailchimp user first
-    _update_mailchimp_merge_fields(user, {"merge_fields": {"MAGICTOKEN": callback_token}})
+    try:
+        # Update the merge field MAGICTOKEN on this Mailchimp user first
+        _update_mailchimp_merge_fields(user, {"merge_fields": {"MAGICTOKEN": callback_token}})
 
-    # Trigger the campaign by the automation API 3.0 endpoint for this user email
-    response = requests.post(campaign_trigger_url,
-                             json={'email_address': user.email},
-                             auth=('anystring', api_settings.PASSWORDLESS_MAILCHIMP_API_KEY))
-    response.raise_for_status()
+        # Trigger the campaign by the automation API 3.0 endpoint for this user email
+        response = requests.post(campaign_trigger_url,
+                                 json={'email_address': user.email},
+                                 auth=('anystring', api_settings.PASSWORDLESS_MAILCHIMP_API_KEY))
+        response.raise_for_status()
 
-    logger.info(response)
+        logger.info(response)
+    except Exception as exc:
+        try:
+            detail = response.json()['detail']
+        except Exception:
+            detail = ""
+        logger.error(f'Failed to send activation email to {user.email}: {exc}\n detail: {detail}')
 
 
 def authenticate_by_token(callback_token):
