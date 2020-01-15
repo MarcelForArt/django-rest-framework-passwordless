@@ -53,8 +53,9 @@ def _update_mailchimp_merge_fields(user, merge_field_dict):
     :return:
     """
     md5_email = hashlib.md5(user.email.encode('utf-8')).hexdigest()
-    member_url = f'{api_settings.PASSWORDLESS_MAILCHIMP_BASE_URL}/lists/{api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID}/members/{md5_email}'
-    r = requests.put(member_url, json=merge_field_dict, auth=('anystring', api_settings.PASSWORDLESS_MAILCHIMP_API_KEY))
+    member_url = f'lists/{api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID}/members/{md5_email}'
+    full_member_url = api_settings.PASSWORDLESS_MAILCHIMP_BASE_URL.format(member_url)
+    r = requests.put(full_member_url, json=merge_field_dict, auth=('anystring', api_settings.PASSWORDLESS_MAILCHIMP_API_KEY))
     r.raise_for_status()
 
 
