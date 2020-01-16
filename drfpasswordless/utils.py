@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+class MailChimpNotRegisteredException(Exception):
+    pass
+
+
+class MailChimpAlreadySentException(Exception):
+    pass
+
+
+class RequiredConfigException(Exception):
+    pass
+
+
 def _send_mandrill_email_msg(recip, callback_token, user, template_name):
     """
     Create the template in Mailchimp then export to Mandrill. Ensure
@@ -70,23 +82,34 @@ def _send_mailchimp_email_msg(user, callback_token, campaign_trigger_url):
                                 (send this email to specific user when that url endpoint is hit)
     :return:
     """
+    # Update MAGICTOKEN merge field
     try:
         # Update the merge field MAGICTOKEN on this Mailchimp user first
         _update_mailchimp_merge_fields(user, {"merge_fields": {"MAGICTOKEN": callback_token}})
+    except requests.exceptions.RequestException as exc:
+        logger.error(f'Could not update MAGICTOKEN mergefield for user {user.email}: {exc}')
+        return
 
+    # With the merge field ready, fire the campaign to this user
+    try:
         # Trigger the campaign by the automation API 3.0 endpoint for this user email
         response = requests.post(campaign_trigger_url,
                                  json={'email_address': user.email},
                                  auth=('anystring', api_settings.PASSWORDLESS_MAILCHIMP_API_KEY))
         response.raise_for_status()
-
         logger.info(response)
-    except Exception as exc:
+    except requests.exceptions.RequestException as exc:
         try:
             detail = response.json()['detail']
-        except Exception:
+        except (AttributeError, KeyError):
             detail = ""
         logger.error(f'Failed to send activation email to {user.email}: {exc}\n detail: {detail}')
+        if detail and 'find the email address' in detail:
+            raise MailChimpNotRegisteredException(detail)
+        elif detail and 'already sent this email to the subscriber' in detail:
+            raise MailChimpAlreadySentException(detail)
+        else:
+            raise exc
 
 
 def authenticate_by_token(callback_token):
@@ -194,7 +217,7 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                     _send_mandrill_email_msg(getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME),
                                              email_token.key, user, template_name)
                 else:
-                    raise Exception('Ensure PASSWORDLESS_TEMPLATE_CHOICES has been set')
+                    raise RequiredConfigException('Ensure PASSWORDLESS_TEMPLATE_CHOICES has been set')
             elif (api_settings.PASSWORDLESS_MAILCHIMP_API_KEY and api_settings.PASSWORDLESS_MAILCHIMP_BASE_URL and
                   api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID):
                 # Go via Mailchimp campaign
@@ -202,7 +225,7 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                 if campaign_trigger_url:
                     _send_mailchimp_email_msg(user, email_token.key, campaign_trigger_url)
                 else:
-                    raise Exception('Ensure to pass the campaign_trigger_url as kwarg')
+                    raise RequiredConfigException('Ensure to pass the campaign_trigger_url as kwarg')
             else:
                 # Get email subject and message
                 email_subject = kwargs.get('email_subject',
@@ -224,16 +247,14 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                     html_message=html_message,)
 
         else:
-            logger.error("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")
-            return False
-        return True
+            RequiredConfigException("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")
 
-    except Exception as e:
+    except Exception as gen_exc:
         logger.error("Failed to send token email to user: %d."
                      "Possibly no email on user object. Email entered was %s" %
                     (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
-        logger.error(e)
-        return False
+        logger.error(gen_exc)
+        raise gen_exc
 
 
 def send_sms_with_callback_token(user, mobile_token, **kwargs):
