@@ -210,7 +210,7 @@ def send_email_with_callback_token(user, email_token, **kwargs):
     try:
         if api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS:
             # Make sure we have a sending address before sending.
-            if api_settings.PASSWORDLESS_MANDRILL_API_KEY:
+            if api_settings.PASSWORDLESS_MANDRILL_API_KEY and kwargs.get('template') is not None:
                 # Go via Mandrill
                 template_name = kwargs.get('template')
                 if template_name:
@@ -219,7 +219,8 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                 else:
                     raise RequiredConfigException('Ensure PASSWORDLESS_TEMPLATE_CHOICES has been set')
             elif (api_settings.PASSWORDLESS_MAILCHIMP_API_KEY and api_settings.PASSWORDLESS_MAILCHIMP_BASE_URL and
-                  api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID):
+                  api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID
+                  and kwargs.get('campaign_trigger_url') is not None):
                 # Go via Mailchimp campaign
                 campaign_trigger_url = kwargs.get('campaign_trigger_url')
                 if campaign_trigger_url:
