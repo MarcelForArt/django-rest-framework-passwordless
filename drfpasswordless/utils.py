@@ -207,55 +207,63 @@ def send_email_with_callback_token(user, email_token, **kwargs):
 
     Passes silently without sending in test environment
     """
-    try:
-        if api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS:
-            # Make sure we have a sending address before sending.
-            if api_settings.PASSWORDLESS_MANDRILL_API_KEY and kwargs.get('template') is not None:
-                # Go via Mandrill
-                template_name = kwargs.get('template')
-                if template_name:
-                    _send_mandrill_email_msg(getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME),
-                                             email_token.key, user, template_name)
-                else:
-                    raise RequiredConfigException('Ensure PASSWORDLESS_TEMPLATE_CHOICES has been set')
-            elif (api_settings.PASSWORDLESS_MAILCHIMP_API_KEY and api_settings.PASSWORDLESS_MAILCHIMP_BASE_URL and
-                  api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID
-                  and kwargs.get('campaign_trigger_url') is not None):
-                # Go via Mailchimp campaign
-                campaign_trigger_url = kwargs.get('campaign_trigger_url')
-                if campaign_trigger_url:
-                    _send_mailchimp_email_msg(user, email_token.key, campaign_trigger_url)
-                else:
-                    raise RequiredConfigException('Ensure to pass the campaign_trigger_url as kwarg')
-            else:
-                # Get email subject and message
-                email_subject = kwargs.get('email_subject',
-                                           api_settings.PASSWORDLESS_EMAIL_SUBJECT)
-                email_plaintext = kwargs.get('email_plaintext',
-                                             api_settings.PASSWORDLESS_EMAIL_PLAINTEXT_MESSAGE)
-                email_html = kwargs.get('email_html',
-                                        api_settings.PASSWORDLESS_EMAIL_TOKEN_HTML_TEMPLATE_NAME)
+    if not api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS:
+        # Make sure we have a sending address before sending.
+        logger.error("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")
+        return False
 
-                # Inject context if user specifies.
-                context = inject_template_context({'callback_token': email_token.key, })
-                html_message = loader.render_to_string(email_html, context,)
-                send_mail(
-                    email_subject,
-                    email_plaintext % email_token.key,
-                    api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
-                    [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
-                    fail_silently=False,
-                    html_message=html_message,)
+    if api_settings.PASSWORDLESS_MANDRILL_API_KEY and kwargs.get('template') is not None:
+        try:
+            # Go via Mandrill (e.g. the upload via desktop popup which fires desktop upload email to user
+            # upon clicking, we want to allow duplicates for this, go with Mandrill). And use success True/False
+            # so drfpasswordless calling view is happy
+            template_name = kwargs.get('template')
+            _send_mandrill_email_msg(getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME),
+                                     email_token.key, user, template_name)
+        except Exception as mandrill_exc:
+            logger.error("Failed to send token email to user: %d."
+                         "Possibly no email on user object. Email entered was %s" %
+                         (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
+            logger.error(mandrill_exc)
+            return False
+    elif (api_settings.PASSWORDLESS_MAILCHIMP_API_KEY and api_settings.PASSWORDLESS_MAILCHIMP_BASE_URL and
+          api_settings.PASSWORDLESS_MAILCHIMP_SUBSCRIBE_LIST_ID
+          and kwargs.get('campaign_trigger_url') is not None):
+        # Go via Mailchimp campaign
+        campaign_trigger_url = kwargs.get('campaign_trigger_url')
+        try:
+            _send_mailchimp_email_msg(user, email_token.key, campaign_trigger_url)
+        except Exception as mailchimp_exc:
+            # For Mailchimp only bubble up exceptions to calling app (Marcel not drfpasswordless view)
+            # rather than true/false as want to take action depending on exception
+            raise mailchimp_exc
+    else:
+        try:
+            # Get email subject and message
+            email_subject = kwargs.get('email_subject',
+                                       api_settings.PASSWORDLESS_EMAIL_SUBJECT)
+            email_plaintext = kwargs.get('email_plaintext',
+                                         api_settings.PASSWORDLESS_EMAIL_PLAINTEXT_MESSAGE)
+            email_html = kwargs.get('email_html',
+                                    api_settings.PASSWORDLESS_EMAIL_TOKEN_HTML_TEMPLATE_NAME)
 
-        else:
-            RequiredConfigException("Failed to send token email. Missing PASSWORDLESS_EMAIL_NOREPLY_ADDRESS.")
-
-    except Exception as gen_exc:
-        logger.error("Failed to send token email to user: %d."
-                     "Possibly no email on user object. Email entered was %s" %
-                    (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
-        logger.error(gen_exc)
-        raise gen_exc
+            # Inject context if user specifies.
+            context = inject_template_context({'callback_token': email_token.key, })
+            html_message = loader.render_to_string(email_html, context,)
+            send_mail(
+                email_subject,
+                email_plaintext % email_token.key,
+                api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
+                [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
+                fail_silently=False,
+                html_message=html_message,)
+        except Exception as gen_exc:
+            logger.error("Failed to send token email to user: %d."
+                         "Possibly no email on user object. Email entered was %s" %
+                         (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
+            logger.error(gen_exc)
+            return False
+    return True
 
 
 def send_sms_with_callback_token(user, mobile_token, **kwargs):
