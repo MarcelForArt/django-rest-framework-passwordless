@@ -1,4 +1,6 @@
 import logging
+from allauth.account.utils import perform_login
+from django.conf import settings
 from rest_framework import parsers, renderers, status
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
@@ -134,17 +136,38 @@ class AbstractBaseObtainAuthToken(APIView):
     """
     serializer_class = None
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+    def _process_request(self, data):
+        serializer = self.serializer_class(data=data)
         if serializer.is_valid(raise_exception=True):
             user = serializer.validated_data['user']
             token = Token.objects.get_or_create(user=user)[0]
 
             if token:
-                # Return our key for consumption.
-                return Response({'token': token.key}, status=status.HTTP_200_OK)
+                return token, user
         else:
             logger.error("Couldn't log in unknown user. Errors on serializer: {}".format(serializer.error_messages))
+        return None
+
+    def get(self, request, *args, **kwargs):
+        redirect_url = request.query_params.get('redirect_url')
+        token = request.query_params.get('token')
+        if token is None:
+            return Response({'detail': 'Missing token.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = {'token': token}
+        token, user = self._process_request(data)
+        # Get an authenticated web session and do a redirect
+        ret = perform_login(request, user, email_verification=settings.ACCOUNT_EMAIL_VERIFICATION,
+                            redirect_url=redirect_url)
+        request.session.set_expiry(settings.SESSION_COOKIE_AGE)
+        return ret
+
+    def post(self, request, *args, **kwargs):
+        token, user = self._process_request(request.data)
+        if token:
+            # Return our key for consumption.
+            return Response({'token': token.key}, status=status.HTTP_200_OK)
+
         return Response({'detail': 'Couldn\'t log you in. Try again later.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
