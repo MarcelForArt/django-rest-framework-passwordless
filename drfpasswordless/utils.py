@@ -48,6 +48,7 @@ def _send_mandrill_email_msg(recip, callback_token, user, template_name):
                                      {'content': user.first_name, 'name': 'first_name'},
                                      {'content': user.marcel_username, 'name': 'marcel_username'},
                                      {'content': web_gallery_url, 'name': 'web_gallery_url'},
+                                     {'content': api_settings.PASSWORDLESS_MARCEL_API_HOST, 'name': 'marcel_api_host'},
                                      {'content': api_settings.PASSWORDLESS_MARCEL_HOST, 'name': 'marcel_host'},
                                      {'content': api_settings.PASSWORDLESS_MAILCHIMP_UNSUB_LINK, 'name': 'redirect_unsub'},
                                      ]
