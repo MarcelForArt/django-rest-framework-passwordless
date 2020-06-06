@@ -42,9 +42,12 @@ def _send_mandrill_email_msg(recip, callback_token, user, template_name):
     """
     mandrill_client = mandrill.Mandrill(api_settings.PASSWORDLESS_MANDRILL_API_KEY)
     # Prepare message to send w/ dynamic content
+    web_gallery_url = f'{api_settings.PASSWORDLESS_MARCEL_HOST}/{user.marcel_username}'
     message = {'to': [{'email': recip, 'type': 'to'}], 'track_opens': True, 'track_clicks': True,
                'global_merge_vars': [{'content': callback_token, 'name': 'callback_token'},
                                      {'content': user.first_name, 'name': 'first_name'},
+                                     {'content': user.marcel_username, 'name': 'marcel_username'},
+                                     {'content': web_gallery_url, 'name': 'web_gallery_url'},
                                      {'content': api_settings.PASSWORDLESS_MARCEL_HOST, 'name': 'marcel_host'},
                                      {'content': api_settings.PASSWORDLESS_MAILCHIMP_UNSUB_LINK, 'name': 'redirect_unsub'},
                                      ]
