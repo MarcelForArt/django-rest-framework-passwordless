@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Error</title>
+    <style>
+        @font-face {
+            font-family: 'Heavy';
+            src: url('https://web.marcelforart.com/assets/assets/fonts/NeueHaasUnicaHeavy.ttf');
+        }
+        @font-face {
+            font-family: 'Medium';
+            src: url('https://web.marcelforart.com/assets/assets/fonts/NeueHaasUnicaW06Medium.ttf');
+        }
+        @font-face {
+            font-family: 'Light';
+            src: url('https://web.marcelforart.com/assets/assets/fonts/NeueHaasUnicaW06-Light.woff2');
+        }
+    </style>
+</head>
+
+<body>
+    <h2>There was an error processing your request: {{ error_message }}</h2>
+</body>
+
+<div style="padding: 20px;color: rgb(18, 18, 18);height: 100vh;text-align: center;">
+        <h1 font-size="36" style="font-family: Heavy; font-size: 36px; line-height: 44px;">Oops! ⚠️</h1>
+        <h2 style="font-family: Medium;font-size: 24px;line-height: 44px;px;">Something went wrong with your login:</h2>
+        <p style="font-family: Light;font-size: 20px;line-height: 44px; color: #ff0000;">{{ error_message }}</p>
+</div>
+
+</html>

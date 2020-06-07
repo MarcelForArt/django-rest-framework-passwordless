@@ -6,6 +6,9 @@ from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated 
 from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
+from django.shortcuts import render
+
 from drfpasswordless.settings import api_settings
 from drfpasswordless.serializers import (
     EmailAuthSerializer,
@@ -155,7 +158,17 @@ class AbstractBaseObtainAuthToken(APIView):
             return Response({'detail': 'Missing token.'}, status=status.HTTP_400_BAD_REQUEST)
 
         data = {'token': token}
-        token, user = self._process_request(data)
+
+        try:
+            token, user = self._process_request(data)
+        except ValidationError as exc:
+            logger.error(exc)
+            msg = 'Unknown error. Contact an admin.'
+            if 'token' in exc.detail:
+                msg = str(exc.detail['token'][0])
+
+            return render(request, 'token_error.html', {'error_message': msg})
+
         # Get an authenticated web session and do a redirect
         ret = perform_login(request, user, email_verification=settings.ACCOUNT_EMAIL_VERIFICATION,
                             redirect_url=redirect_url)
