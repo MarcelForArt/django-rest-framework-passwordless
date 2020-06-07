@@ -54,7 +54,7 @@ def _send_mandrill_email_msg(recip, callback_token, user, template_name):
                                      ]
                }
     result = mandrill_client.messages.send_template(template_name=template_name, template_content=[],
-                                                    message=message, async=False, ip_pool='Main Pool')
+                                                    message=message, asynchronous=False, ip_pool='Main Pool')
     logger.info(result)
 
 
