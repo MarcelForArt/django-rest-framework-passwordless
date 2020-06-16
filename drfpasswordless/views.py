@@ -162,10 +162,12 @@ class AbstractBaseObtainAuthToken(APIView):
         try:
             token, user = self._process_request(data)
         except ValidationError as exc:
-            logger.error(exc)
             msg = 'Unknown error. Contact an admin.'
             if 'token' in exc.detail:
                 msg = str(exc.detail['token'][0])
+            else:
+                # If it's not the standard token invalid error log as error to see on sentry etc
+                logger.error(exc)
 
             return render(request, 'token_error.html', {'error_message': msg})
 
